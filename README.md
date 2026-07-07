@@ -74,17 +74,18 @@ request and send the response; validation/auth/errors are cross-cutting middlewa
 
 ```mermaid
 flowchart LR
-    Client([Client<br/>curl · Postman · SPA]) --> MW["Express middleware<br/>JSON · Morgan · /uploads static"]
+    Client([Client]) --> MW["Express middleware<br/>JSON, Morgan, static files"]
     MW --> Router[Router]
-    Router --> Auth{JWT guard?}
+    Router --> Auth{"JWT guard?"}
     Auth -->|/auth/login| Ctrl[Controllers]
-    Auth -->|protected routes| Ctrl
-    Router --> Upload[Multer<br/>photo upload] --> Disk[(/uploads)]
-    Ctrl --> Svc[Services<br/>business logic]
-    Svc --> Knex[(Knex<br/>query builder)]
-    Knex --> PG[(PostgreSQL)]
-    MW -. errors .-> ErrHandler[ErrorHandler<br/>→ error envelope]
-    Svc -. success .-> Resp["sendSuccess<br/>→ success envelope"]
+    Auth -->|protected route| Ctrl
+    Router --> Upload["Multer photo upload"]
+    Upload --> Disk[("/uploads")]
+    Ctrl --> Svc["Services<br/>business logic"]
+    Svc --> Knex[("Knex query builder")]
+    Knex --> PG[("PostgreSQL")]
+    MW -.->|errors| ErrHandler["ErrorHandler to error envelope"]
+    Svc -.->|success| Resp["sendSuccess to success envelope"]
 ```
 
 **Request lifecycle** — request → body parsers → static files → router → (validation) → JWT guard →
@@ -115,7 +116,7 @@ erDiagram
         varchar designation
         date hiring_date
         date date_of_birth
-        numeric_12_2 salary
+        numeric salary
         varchar photo_path
         timestamptz deleted_at
         timestamptz created_at
@@ -129,7 +130,7 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
-    employees ||--o{ attendance : "has (cascade delete)"
+    employees ||--o{ attendance : has
 ```
 
 - `attendance.employee_id` → `employees.id` **ON DELETE CASCADE**
@@ -276,14 +277,14 @@ typed `user` field).
 ```mermaid
 sequenceDiagram
     autonumber
-    Client->>API: POST /auth/login { email, password }
-    API->>DB: find hr_user; bcrypt.compare(password, hash)
+    Client->>API: POST /auth/login
+    API->>DB: find user then bcrypt compare
     DB-->>API: match
-    API-->>Client: 200 { accessToken, tokenType, expiresIn, user }
-    Client->>API: GET /employees  (Authorization: Bearer <accessToken>)
-    API->>DB: SELECT employees WHERE deleted_at IS NULL
+    API-->>Client: 200 with JWT
+    Client->>API: GET /employees with Bearer token
+    API->>DB: list non-deleted employees
     DB-->>API: rows
-    API-->>Client: 200 { success, data: { items, meta } }
+    API-->>Client: 200 with paginated data
 ```
 
 Missing/invalid token → `401 Unauthorized`.
