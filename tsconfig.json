@@ -1,13 +1,12 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
     "target": "ES2022",
+    "lib": ["ES2022"],
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
@@ -18,18 +17,13 @@
     "strictBindCallApply": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
-    // DTOs/entities are populated by class-validator/class-transformer/TypeORM
-    // via reflection (not constructors), so enforcing field initialization here
-    // would require noise-only `!` assertions. All type-safety-affecting strict
-    // flags above remain enabled.
-    "strictPropertyInitialization": false,
-    // Friendlier to decorators + class-transformer (classic NestJS behaviour).
-    "useDefineForClassFields": false,
     "forceConsistentCasingInFileNames": true,
-    "noUnusedLocals": false,
     "noFallthroughCasesInSwitch": true,
-    "resolveJsonModule": true
+    // DTO/row/service objects are populated by reflection/Knex, not constructors;
+    // all other strict flags remain enabled.
+    "strictPropertyInitialization": false,
+    "useDefineForClassFields": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "test", "dist"]
+  "exclude": ["node_modules", "dist", "test", "coverage"]
 }

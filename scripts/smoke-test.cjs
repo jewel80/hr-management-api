@@ -4,7 +4,7 @@
  * Integration smoke test for the HR Management API.
  *
  * Requires a RUNNING server and a SEEDED database:
- *   npm run db:migrate:run && npm run db:seed
+ *   npm run db:migrate:latest && npm run db:seed
  *   npm run start:dev          # in another terminal
  *   npm run test:smoke
  *
@@ -14,6 +14,8 @@
  *   SMOKE_PASS=Admin@12345
  */
 const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 const BASE = process.env.SMOKE_BASE || 'http://localhost:3000';
 const USER = process.env.SMOKE_USER || 'admin@example.com';
@@ -33,7 +35,7 @@ const ok = (name, cond, extra = '') => {
 
 const pngB64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
-const tmpPng = require('path').join(require('os').tmpdir(), 'hr-smoke.png');
+const tmpPng = path.join(os.tmpdir(), 'hr-smoke.png');
 
 (async () => {
   fs.writeFileSync(tmpPng, Buffer.from(pngB64, 'base64'));
@@ -61,7 +63,7 @@ const tmpPng = require('path').join(require('os').tmpdir(), 'hr-smoke.png');
   const token = body.data?.accessToken;
   const auth = { Authorization: `Bearer ${token}` };
 
-  // 3. employees list + envelope
+  // 3. employees list + envelope + pagination
   r = await fetch(`${BASE}/employees?page=1&limit=10`, { headers: auth });
   body = await r.json();
   ok(
@@ -111,19 +113,19 @@ const tmpPng = require('path').join(require('os').tmpdir(), 'hr-smoke.png');
   r = await fetch(`${BASE}/attendance`, {
     method: 'POST',
     headers: { ...auth, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ employeeId: empId, date, checkInTime: '08:30' }),
+    body: JSON.stringify({ employee_id: empId, date, check_in_time: '08:30' }),
   });
   body = await r.json();
   const firstId = body.data?.id;
   ok(
     'POST /attendance inserts + normalizes HH:mm -> HH:mm:ss',
-    r.status >= 200 && r.status < 300 && body.data?.checkInTime === '08:30:00',
-    `status=${r.status} time=${body.data?.checkInTime}`,
+    r.status >= 200 && r.status < 300 && body.data?.check_in_time === '08:30:00',
+    `status=${r.status} time=${body.data?.check_in_time}`,
   );
   r = await fetch(`${BASE}/attendance`, {
     method: 'POST',
     headers: { ...auth, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ employeeId: empId, date, checkInTime: '10:15:00' }),
+    body: JSON.stringify({ employee_id: empId, date, check_in_time: '10:15:00' }),
   });
   body = await r.json();
   ok(
@@ -131,8 +133,8 @@ const tmpPng = require('path').join(require('os').tmpdir(), 'hr-smoke.png');
     r.status >= 200 &&
       r.status < 300 &&
       body.data?.id === firstId &&
-      body.data?.checkInTime === '10:15:00',
-    `sameId=${body.data?.id === firstId} time=${body.data?.checkInTime}`,
+      body.data?.check_in_time === '10:15:00',
+    `sameId=${body.data?.id === firstId} time=${body.data?.check_in_time}`,
   );
 
   // 8. multipart create with photo
@@ -140,8 +142,8 @@ const tmpPng = require('path').join(require('os').tmpdir(), 'hr-smoke.png');
   form.append('name', 'Smoke User');
   form.append('age', '29');
   form.append('designation', 'QA Engineer');
-  form.append('hiringDate', '2024-01-01');
-  form.append('dateOfBirth', '1996-01-01');
+  form.append('hiring_date', '2024-01-01');
+  form.append('date_of_birth', '1996-01-01');
   form.append('salary', '95000');
   form.append(
     'photo',
@@ -151,17 +153,17 @@ const tmpPng = require('path').join(require('os').tmpdir(), 'hr-smoke.png');
   r = await fetch(`${BASE}/employees`, { method: 'POST', headers: auth, body: form });
   body = await r.json();
   ok(
-    'POST /employees multipart with photo -> photoUrl',
+    'POST /employees multipart with photo -> photo_url',
     r.status >= 200 &&
       r.status < 300 &&
-      !!body.data?.photoUrl &&
+      !!body.data?.photo_url &&
       body.data?.salary === 95000,
-    `status=${r.status} photoUrl=${body.data?.photoUrl}`,
+    `status=${r.status} photo_url=${body.data?.photo_url}`,
   );
 
   // 9. photo is served
-  if (body.data?.photoUrl) {
-    const pr = await fetch(body.data.photoUrl);
+  if (body.data?.photo_url) {
+    const pr = await fetch(body.data.photo_url);
     ok(
       'GET /uploads/<file> serves the photo',
       pr.status === 200 && pr.headers.get('content-type') === 'image/png',
