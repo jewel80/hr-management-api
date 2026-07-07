@@ -56,6 +56,14 @@ showing days present and late arrivals (`check_in_time > 09:45:00`).
 - 🗄️ Knex **migrations & seeds**, connection pool sized from env
 - 🧪 Jest unit tests + an end-to-end smoke suite (10/10 passing)
 
+### 📸 In action
+
+A JWT login followed by a protected `GET /employees` request, showing the standard response envelope:
+
+<p align="center">
+  <img src="docs/screenshots/terminal.svg" alt="Terminal session: JWT login then a protected GET /employees request, with the success response envelope" width="860">
+</p>
+
 ---
 
 ## 🏗️ Architecture
