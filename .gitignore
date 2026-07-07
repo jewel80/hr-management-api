@@ -1,0 +1,45 @@
+# compiled output
+/dist
+/node_modules
+/build
+
+# test coverage
+/coverage
+
+# logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+Thumbnails.db
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+
+# uploaded files
+/uploads/*
+!/uploads/.gitkeep
+
+# TypeORM cache
+.ormconfig
+
+# TypeScript incremental build
+*.tsbuildinfo
