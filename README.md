@@ -495,6 +495,20 @@ RESULT pass=10 fail=0
 ```
 </details>
 
+### 📮 Postman collection
+
+A ready-to-import collection ships at the repo root — **[`HR-Management-API.postman_collection.json`](./HR-Management-API.postman_collection.json)**.
+
+In Postman: *File → Import* → select the file. It includes:
+
+- **4 folders** — Auth, Employees, Attendance, Reports (all 12 endpoints).
+- **Variables** — `baseUrl`, `token`, `employeeId`, `attendanceId`, `month`, `from`, `to`.
+- **Auto-auth** — running **Auth › Login** stores the JWT into `token`; every protected request then sends `Authorization: Bearer {{token}}` automatically (auth is set at the folder level).
+- **Sample bodies** — including the `multipart/form-data` photo upload for Create/Update employee, and the attendance upsert.
+- **Chained IDs** — Create employee → sets `employeeId`; Upsert attendance → sets `attendanceId`.
+
+> Seed login: `admin@example.com` / `Admin@12345`.
+
 ---
 
 ## 📜 Scripts

@@ -1,0 +1,542 @@
+{
+  "info": {
+    "_postman_id": "7c1e9b4a-2d6f-4e1b-9a3c-1f5e8a2b7d90",
+    "name": "HR Management API",
+    "description": "Postman collection for the HR Management API (Express + Knex + PostgreSQL).\n\n## Quick start\n1. Start the server (`npm run start:dev`) and seed the DB (`npm run db:seed`).\n2. Set the `baseUrl` variable if your server runs elsewhere (default `http://localhost:3000`).\n3. Run **Auth › Login** — it automatically saves the JWT to the `token` variable.\n4. All protected requests (Employees / Attendance / Reports) send `Authorization: Bearer {{token}}` automatically.\n\n## Notes\n- The response is always wrapped in `{ success, statusCode, timestamp, data }`.\n- Resource field names are snake_case: `employee_id`, `check_in_time`, `hiring_date`, `days_present`, etc.\n- Seed credentials: `admin@example.com` / `Admin@12345`.\n- `check_in_time` accepts `HH:mm` or `HH:mm:ss`. Late = check-in after `09:45:00`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "API base URL (no trailing slash)."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT access token. Auto-populated by Auth › Login."
+    },
+    {
+      "key": "employeeId",
+      "value": "1",
+      "type": "string",
+      "description": "Sample employee id. Auto-updated by Employees › Create employee (with photo)."
+    },
+    {
+      "key": "attendanceId",
+      "value": "1",
+      "type": "string",
+      "description": "Sample attendance id. Auto-updated by Attendance › Upsert attendance."
+    },
+    {
+      "key": "month",
+      "value": "2026-07",
+      "type": "string",
+      "description": "Report month in YYYY-MM format."
+    },
+    {
+      "key": "from",
+      "value": "2026-07-01",
+      "type": "string",
+      "description": "Inclusive lower date bound for attendance filtering (YYYY-MM-DD)."
+    },
+    {
+      "key": "to",
+      "value": "2026-07-31",
+      "type": "string",
+      "description": "Inclusive upper date bound for attendance filtering (YYYY-MM-DD)."
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Authentication. The Login request auto-saves the JWT to the `token` collection variable.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 and access token returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.data.accessToken).to.be.a('string');",
+                  "    pm.collectionVariables.set('token', body.data.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"Admin@12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticate an HR user with email/password and receive a JWT.\n\n**Response 200** — `{ success: true, data: { accessToken, tokenType, expiresIn, user: { id, email, name } } }`.\n\nThe collection test script stores `data.accessToken` into the `token` variable, so every protected request that follows is authenticated automatically."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Employees",
+      "description": "Employee CRUD. Soft-deleted employees are excluded from list/search. All routes require JWT auth (inherited from this folder).",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "List employees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/employees?page=1&limit=10&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (1-based)."
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Page size (1-100)."
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Optional case-insensitive (ILIKE) substring match on employee name."
+                }
+              ]
+            },
+            "description": "Paginated list of non-deleted employees.\n\n**Response 200** — `{ success: true, data: { items: [Employee], meta: { page, limit, total, totalPages } } }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get employee by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/employees/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "{{employeeId}}"
+              ]
+            },
+            "description": "Fetch a single non-deleted employee.\n\n**Response 200** — `{ success: true, data: Employee }` (includes derived `photo_url`).\n\n**404** if the id does not exist or is soft-deleted."
+          },
+          "response": []
+        },
+        {
+          "name": "Create employee (multipart, with photo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Employee created (2xx) and id captured', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('employeeId', body.data.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "John Doe",
+                  "type": "text"
+                },
+                {
+                  "key": "age",
+                  "value": "30",
+                  "type": "text",
+                  "description": "Integer, 18-120."
+                },
+                {
+                  "key": "designation",
+                  "value": "Software Engineer",
+                  "type": "text"
+                },
+                {
+                  "key": "hiring_date",
+                  "value": "2023-01-15",
+                  "type": "text",
+                  "description": "YYYY-MM-DD."
+                },
+                {
+                  "key": "date_of_birth",
+                  "value": "1993-05-20",
+                  "type": "text",
+                  "description": "YYYY-MM-DD."
+                },
+                {
+                  "key": "salary",
+                  "value": "85000",
+                  "type": "text",
+                  "description": "Numeric, max 2 decimals."
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "",
+                  "description": "Optional employee photo (png/jpg/jpeg/gif/webp). Select a file in Postman; leave empty to create without a photo."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees"
+              ]
+            },
+            "description": "Create an employee using `multipart/form-data`. All fields are sent as text parts; `photo` is an optional binary part.\n\n**Response 201** — `{ success: true, data: Employee }`. The test script stores `data.id` into the `employeeId` variable.\n\nDo **not** set a `Content-Type` header — Postman sets the multipart boundary automatically."
+          },
+          "response": []
+        },
+        {
+          "name": "Update employee (multipart, optional new photo)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "designation",
+                  "value": "Senior Software Engineer",
+                  "type": "text",
+                  "description": "Any subset of employee fields may be provided."
+                },
+                {
+                  "key": "salary",
+                  "value": "95000",
+                  "type": "text"
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "",
+                  "description": "Optional. Including a new photo replaces the previous one (old file is deleted)."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/employees/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "{{employeeId}}"
+              ]
+            },
+            "description": "Update an employee. Provide only the fields you want to change (at least one). Include a `photo` part to replace the photo.\n\n**Response 200** — `{ success: true, data: Employee }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete employee (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/employees/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "{{employeeId}}"
+              ]
+            },
+            "description": "Soft-delete an employee (sets `deleted_at`). The row is excluded from list/search but retained for history.\n\n**Response 200** — `{ success: true, data: null }`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Attendance",
+      "description": "Attendance CRUD with upsert on `(employee_id, date)`. All routes require JWT auth (inherited from this folder).",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "List attendance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/attendance?employee_id={{employeeId}}&from={{from}}&to={{to}}&page=1&limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance"
+              ],
+              "query": [
+                {
+                  "key": "employee_id",
+                  "value": "{{employeeId}}",
+                  "description": "Optional: filter by employee id."
+                },
+                {
+                  "key": "from",
+                  "value": "{{from}}",
+                  "description": "Optional: inclusive lower date bound (YYYY-MM-DD)."
+                },
+                {
+                  "key": "to",
+                  "value": "{{to}}",
+                  "description": "Optional: inclusive upper date bound (YYYY-MM-DD)."
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Paginated, filterable list of attendance records.\n\n**Response 200** — `{ success: true, data: { items: [Attendance], meta } }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get attendance by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/attendance/{{attendanceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "{{attendanceId}}"
+              ]
+            },
+            "description": "Fetch a single attendance record.\n\n**Response 200** — `{ success: true, data: Attendance }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert attendance",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Attendance upserted (2xx) and id captured', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('attendanceId', body.data.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": {{employeeId}},\n  \"date\": \"2026-07-08\",\n  \"check_in_time\": \"09:30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/attendance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance"
+              ]
+            },
+            "description": "Create or update attendance for a given employee/date. If a row for `(employee_id, date)` already exists, its `check_in_time` is updated instead of inserting a duplicate (Postgres `ON CONFLICT`, concurrency-safe).\n\n`check_in_time` accepts `HH:mm` or `HH:mm:ss`.\n\n**Response 201** — `{ success: true, data: Attendance }`. The test script stores `data.id` into `attendanceId`."
+          },
+          "response": []
+        },
+        {
+          "name": "Update attendance",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"check_in_time\": \"10:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/attendance/{{attendanceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "{{attendanceId}}"
+              ]
+            },
+            "description": "Update an attendance record. Provide any subset of `employee_id`, `date`, `check_in_time` (at least one).\n\n**Response 200** — `{ success: true, data: Attendance }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete attendance",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/attendance/{{attendanceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "{{attendanceId}}"
+              ]
+            },
+            "description": "Permanently delete an attendance record.\n\n**Response 200** — `{ success: true, data: null }`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "description": "Read-only reporting. All routes require JWT auth (inherited from this folder).",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Monthly attendance report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/attendance?month={{month}}&employee_id={{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "attendance"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "{{month}}",
+                  "description": "Required. Report month in YYYY-MM (e.g. 2026-07)."
+                },
+                {
+                  "key": "employee_id",
+                  "value": "{{employeeId}}",
+                  "description": "Optional: restrict the report to a single employee."
+                }
+              ]
+            },
+            "description": "Monthly attendance summary, grouped per (non-deleted) employee.\n\n**Response 200** — `{ success: true, data: { month, employee_id, items: [ { employee_id, name, days_present, times_late } ] } }`.\n\n`times_late` counts check-ins where `check_in_time > 09:45:00`."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
