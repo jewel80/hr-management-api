@@ -24,8 +24,8 @@ export class AttendanceController {
 
   create = async (req: Request, res: Response): Promise<void> => {
     const body = req.body as CreateAttendanceBody;
-    const result = await this.attendanceService.create(body);
-    sendSuccess(res, result, 201);
+    const { data, created } = await this.attendanceService.create(body);
+    sendSuccess(res, data, created ? 201 : 200);
   };
 
   update = async (req: Request, res: Response): Promise<void> => {

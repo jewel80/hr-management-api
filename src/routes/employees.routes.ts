@@ -20,14 +20,14 @@ export const buildEmployeesRoutes = (controller: EmployeesController): Router =>
   router.post(
     '/',
     upload.single('photo'),
-    validate(createEmployeeSchema, 'body'),
+    validate(createEmployeeSchema, 'body', { removeFileOnError: true }),
     asyncHandler(controller.create),
   );
   router.put(
     '/:id',
     validate(idParamSchema, 'params'),
     upload.single('photo'),
-    validate(updateEmployeeSchema, 'body'),
+    validate(updateEmployeeSchema, 'body', { removeFileOnError: true }),
     asyncHandler(controller.update),
   );
   router.delete(

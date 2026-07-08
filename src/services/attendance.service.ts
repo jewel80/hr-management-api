@@ -15,47 +15,57 @@ export class AttendanceService {
    * otherwise a new row is inserted. Implemented with Postgres
    * `INSERT ... ON CONFLICT DO UPDATE` so concurrent requests are safe.
    */
-  async create(input: CreateAttendanceBody): Promise<AttendanceResponse> {
+  async create(
+    input: CreateAttendanceBody,
+  ): Promise<{ data: AttendanceResponse; created: boolean }> {
     await this.assertEmployeeExists(input.employee_id);
     const checkInTime = normalizeCheckInTime(input.check_in_time);
 
-    await db.raw(
+    // Atomic upsert via ON CONFLICT. `(xmax = 0)` is true only for a row that
+    // was just INSERTed (xmax holds the xid of a transaction that
+    // deleted/updated the row; 0 means none did), so we can distinguish a real
+    // insert from an ON CONFLICT update and return the correct status code.
+    const result = await db.raw(
       `INSERT INTO attendance (employee_id, date, check_in_time)
        VALUES (?, ?, ?)
        ON CONFLICT (employee_id, date)
-       DO UPDATE SET check_in_time = EXCLUDED.check_in_time, updated_at = now()`,
+       DO UPDATE SET check_in_time = EXCLUDED.check_in_time, updated_at = now()
+       RETURNING *, (xmax = 0) AS inserted`,
       [input.employee_id, input.date, checkInTime],
     );
 
-    const row = await db<AttendanceRow>('attendance')
-      .where({ employee_id: input.employee_id, date: input.date })
-      .first();
+    const row = (result.rows?.[0] ?? result[0]) as
+      (AttendanceRow & { inserted: boolean }) | undefined;
     if (!row) {
       throw new Error('Upsert did not produce an attendance row.');
     }
-    return this.toResponse(row);
+    return { data: this.toResponse(row), created: row.inserted === true };
   }
 
   async findMany(query: AttendanceQuery): Promise<Paginated<AttendanceResponse>> {
     const { page, limit, employee_id, from, to } = query;
     const offset = (page - 1) * limit;
 
-    const base = db<AttendanceRow>('attendance');
+    // Join employees so attendance for soft-deleted employees is excluded.
+    const base = db<AttendanceRow>({ a: 'attendance' })
+      .join('employees as e', 'e.id', 'a.employee_id')
+      .whereNull('e.deleted_at');
     if (employee_id) {
-      base.where({ employee_id });
+      base.where('a.employee_id', employee_id);
     }
     if (from) {
-      base.where('date', '>=', from);
+      base.where('a.date', '>=', from);
     }
     if (to) {
-      base.where('date', '<=', to);
+      base.where('a.date', '<=', to);
     }
 
     const [rows, countRow] = await Promise.all([
       base
         .clone()
-        .orderBy('date', 'desc')
-        .orderBy('check_in_time', 'desc')
+        .select('a.*')
+        .orderBy('a.date', 'desc')
+        .orderBy('a.check_in_time', 'desc')
         .limit(limit)
         .offset(offset),
       base.clone().count('* as count').first<{ count: string }>(),

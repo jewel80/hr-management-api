@@ -35,9 +35,9 @@ export class ReportsService {
         'e.id as employee_id',
         'e.name as name',
         db.raw('COUNT(a.id)::int as days_present'),
-        db.raw(
-          `COUNT(a.id) FILTER (WHERE a.check_in_time > '${LATE_THRESHOLD}')::int as times_late`,
-        ),
+        db.raw('COUNT(a.id) FILTER (WHERE a.check_in_time > ?)::int as times_late', [
+          LATE_THRESHOLD,
+        ]),
       )
       .groupBy('e.id', 'e.name')
       .orderBy('name', 'asc');
